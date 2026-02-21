@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firewall - Lost & Found AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #ff9ecf, #ff4fa3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(15px);
+      padding: 40px;
+      border-radius: 25px;
+      width: 420px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+      color: white;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+      font-weight: 600;
+    }
+
+    h2 {
+      margin-top: 25px;
+      font-size: 18px;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    input {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      background: white;
+      color: black;
+    }
+
+    button {
+      background: white;
+      color: #ff4fa3;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+
+    button:hover {
+      background: #ffe3f0;
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.4);
+      margin: 25px 0;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 20px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>💖 Firewall AI</h1>
+
+  <h2>Upload Found Item (Private)</h2>
+  <form action="/upload-found" method="POST" enctype="multipart/form-data">
+    <input type="file" name="image" required />
+    <input type="text" name="location" placeholder="Location Found" required />
+    <input type="text" name="description" placeholder="Describe the item" required />
+    <button type="submit">Submit Found</button>
+  </form>
+
+  <div class="divider"></div>
+
+  <h2>Upload Lost Item</h2>
+  <form action="/upload-lost" method="POST" enctype="multipart/form-data">
+    <input type="file" name="image" required />
+    <input type="text" name="location" placeholder="Location Lost" required />
+    <input type="text" name="description" placeholder="Describe the lost item" required />
+    <button type="submit">Submit Lost</button>
+  </form>
+
+  <div class="footer">
+    ✨ AI-powered campus recovery system
+  </div>
+</div>
+
+</body>
+</html>
