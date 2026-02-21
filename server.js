@@ -1,29 +1,47 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const cloudinary = require("cloudinary").v2;
-const multer = require("multer");
-const { imageHash } = require("image-hash");
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import cloudinary from "cloudinary";
+import multer from "multer";
+import { imageHash } from "image-hash";
+import { fileURLToPath } from "url";
+import path from "path";
 
+/* ================================
+   SETUP __dirname (ESM SAFE)
+================================ */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/* ================================
+   ENV + APP INIT
+================================ */
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
-cloudinary.config({
+/* ================================
+   CLOUDINARY
+================================ */
+cloudinary.v2.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
   api_secret: process.env.API_SECRET,
 });
 
+/* ================================
+   MULTER
+================================ */
 const upload = multer({ storage: multer.memoryStorage() });
 
 let foundItems = [];
 
-/* =================================
-   IMAGE HASH FUNCTION
-================================= */
+/* ================================
+   IMAGE HASH
+================================ */
 function getImageHash(imageUrl) {
   return new Promise((resolve, reject) => {
     imageHash(imageUrl, 16, true, (error, data) => {
@@ -33,9 +51,9 @@ function getImageHash(imageUrl) {
   });
 }
 
-/* =================================
-   HAMMING DISTANCE (Image Compare)
-================================= */
+/* ================================
+   HAMMING DISTANCE
+================================ */
 function hammingDistance(a, b) {
   let distance = 0;
   for (let i = 0; i < a.length; i++) {
@@ -44,9 +62,9 @@ function hammingDistance(a, b) {
   return distance;
 }
 
-/* =================================
-   KEYWORD MATCHING (0-30)
-================================= */
+/* ================================
+   KEYWORD SCORE
+================================ */
 function calculateKeywordScore(desc1, desc2) {
   if (!desc1 || !desc2) return 0;
 
@@ -54,7 +72,6 @@ function calculateKeywordScore(desc1, desc2) {
   const words2 = desc2.toLowerCase().split(" ");
 
   let matchCount = 0;
-
   words1.forEach(word => {
     if (words2.includes(word)) matchCount++;
   });
@@ -64,35 +81,26 @@ function calculateKeywordScore(desc1, desc2) {
 }
 
 /* ================================
-   Upload Found Item
+   UPLOAD FOUND
 ================================ */
 app.post("/upload-found", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No image uploaded" });
-  }
+  if (!req.file) return res.status(400).json({ error: "No image uploaded" });
 
-  const stream = cloudinary.uploader.upload_stream(
+  const stream = cloudinary.v2.uploader.upload_stream(
     { tags: ["found-item"] },
     async (error, result) => {
       if (error) return res.status(500).json(error);
 
-      try {
-        const hash = await getImageHash(result.secure_url);
+      const hash = await getImageHash(result.secure_url);
 
-        foundItems.push({
-          image: result.secure_url,
-          location: req.body.location,
-          description: req.body.description,
-          imageHash: hash
-        });
+      foundItems.push({
+        image: result.secure_url,
+        location: req.body.location,
+        description: req.body.description,
+        imageHash: hash,
+      });
 
-        res.json({
-          message: "Found item stored privately",
-        });
-
-      } catch (err) {
-        res.status(500).json({ error: "Hash generation failed" });
-      }
+      res.json({ message: "Found item stored privately" });
     }
   );
 
@@ -100,71 +108,48 @@ app.post("/upload-found", upload.single("image"), async (req, res) => {
 });
 
 /* ================================
-   Upload Lost Item (Full AI Score)
+   UPLOAD LOST
 ================================ */
 app.post("/upload-lost", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).send("No image uploaded");
-  }
+  if (!req.file) return res.status(400).send("No image uploaded");
 
-  const stream = cloudinary.uploader.upload_stream(
+  const stream = cloudinary.v2.uploader.upload_stream(
     {},
     async (error, result) => {
       if (error) return res.status(500).json(error);
 
-      try {
-        const lostHash = await getImageHash(result.secure_url);
+      const lostHash = await getImageHash(result.secure_url);
 
-        let bestMatch = null;
-        let highestScore = 0;
+      let bestMatch = null;
+      let highestScore = 0;
 
-        for (const item of foundItems) {
-          let totalScore = 0;
+      for (const item of foundItems) {
+        let score = 0;
 
-          /* 🖼 IMAGE SIMILARITY (0-50) */
-          const distance = hammingDistance(item.imageHash, lostHash);
-          const maxBits = item.imageHash.length;
-          const imageSimilarity = 100 - (distance / maxBits) * 100;
-          const imageScore = (imageSimilarity / 100) * 50;
-          totalScore += imageScore;
+        const distance = hammingDistance(item.imageHash, lostHash);
+        const imageScore = ((100 - (distance / item.imageHash.length) * 100) / 100) * 50;
+        score += imageScore;
 
-          /* 📍 LOCATION (0-20) */
-          if (item.location === req.body.location) {
-            totalScore += 20;
-          }
+        if (item.location === req.body.location) score += 20;
 
-          /* 📝 KEYWORDS (0-30) */
-          totalScore += calculateKeywordScore(
-            item.description,
-            req.body.description
-          );
+        score += calculateKeywordScore(item.description, req.body.description);
 
-          if (totalScore > highestScore) {
-            highestScore = totalScore;
-            bestMatch = item;
-          }
+        if (score > highestScore) {
+          highestScore = score;
+          bestMatch = item;
         }
-
-        if (!bestMatch) {
-          return res.send(`
-            <h2>No Match Found ❌</h2>
-            <a href="/upload-page">Go Back</a>
-          `);
-        }
-
-        res.send(`
-          <h2>🔥 Match Found!</h2>
-          <p><strong>Total Score:</strong> ${highestScore.toFixed(2)} / 100</p>
-          <p><strong>Location:</strong> ${bestMatch.location}</p>
-          <p><strong>Description:</strong> ${bestMatch.description}</p>
-          <img src="${bestMatch.image}" width="300" />
-          <br/><br/>
-          <a href="/upload-page">Go Back</a>
-        `);
-
-      } catch (err) {
-        res.status(500).json({ error: "Matching failed" });
       }
+
+      if (!bestMatch) {
+        return res.send("<h2>No Match Found ❌</h2>");
+      }
+
+      res.send(`
+        <h2>🔥 Match Found!</h2>
+        <p>Score: ${highestScore.toFixed(2)} / 100</p>
+        <p>${bestMatch.description}</p>
+        <img src="${bestMatch.image}" width="300"/>
+      `);
     }
   );
 
@@ -172,34 +157,16 @@ app.post("/upload-lost", upload.single("image"), async (req, res) => {
 });
 
 /* ================================
-   Simple Browser Test Page
+   ROOT
 ================================ */
-app.get("/upload-page", (req, res) => {
-  res.send(`
-    <h2>🔥 FIREWALL Lost & Found AI</h2>
-
-    <h3>Upload Found Item (Private)</h3>
-    <form action="/upload-found" method="POST" enctype="multipart/form-data">
-      <input type="file" name="image" required /><br/><br/>
-      <input type="text" name="location" placeholder="Location found" required /><br/><br/>
-      <input type="text" name="description" placeholder="Describe the item" required /><br/><br/>
-      <button type="submit">Upload Found</button>
-    </form>
-
-    <hr/>
-
-    <h3>Upload Lost Item</h3>
-    <form action="/upload-lost" method="POST" enctype="multipart/form-data">
-      <input type="file" name="image" required /><br/><br/>
-      <input type="text" name="location" placeholder="Location lost" required /><br/><br/>
-      <input type="text" name="description" placeholder="Describe the lost item" required /><br/><br/>
-      <button type="submit">Upload Lost</button>
-    </form>
-  `);
-});
-
 app.get("/", (req, res) => {
-  res.send("FIREWALL Lost & Found AI running 🔥");
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+/* ================================
+   START SERVER
+================================ */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`🔥 FIREWALL running on port ${PORT}`)
+);

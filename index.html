@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>One Campus AI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>One Campus AI</h1>
+
+    <h2>Phishing Detector</h2>
+    <textarea id="emailInput" placeholder="Paste suspicious email here"></textarea>
+    <button onclick="checkPhishing()">Check Risk</button>
+    <p id="phishingResult"></p>
+
+    <hr>
+
+    <h2>Complaint Router</h2>
+    <textarea id="complaintInput" placeholder="Describe your complaint"></textarea>
+    <button onclick="submitComplaint()">Submit Complaint</button>
+    <p id="complaintResult"></p>
+<hr>
+
+<h2>Lost & Found</h2>
+<input type="file" id="imageInput">
+<button onclick="uploadImage()">Upload</button>
+<p id="lostResult"></p>
+    <script src="script.js"></script>
+
+</body>
+</html>
